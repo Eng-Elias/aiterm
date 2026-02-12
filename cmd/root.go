@@ -1,12 +1,9 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
@@ -28,6 +25,7 @@ var rootCmd = &cobra.Command{
 	Use:   "aiterm [prompt]",
 	Short: "AI-powered terminal command generator",
 	Long: `aiterm generates shell commands from natural language descriptions.
+Simply describe what you want and aiterm prints the command you can run.
 
 Examples:
   aiterm "list all files larger than 100MB"
@@ -56,7 +54,7 @@ func Execute() {
 	}
 }
 
-// runGenerate handles the main flow: generate command → confirm → execute.
+// runGenerate sends the prompt to the AI and prints the suggested command.
 func runGenerate(prompt, target string) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -64,14 +62,12 @@ func runGenerate(prompt, target string) error {
 	}
 
 	if err := cfg.Validate(); err != nil {
-		fmt.Println("AI not configured. Run 'aiterm setup' first.")
+		fmt.Fprintln(os.Stderr, "AI not configured. Run 'aiterm setup' first.")
 		return err
 	}
 
-	// Resolve target for display
 	osName, shellType := ai.ResolveTargetOS(target)
-	fmt.Printf("\033[90mTarget: %s (%s)\033[0m\n", osName, shellType)
-	fmt.Printf("\033[90mGenerating command...\033[0m\n")
+	fmt.Fprintf(os.Stderr, "\033[90m[%s / %s] Generating...\033[0m\n", osName, shellType)
 
 	client := ai.NewClient(cfg)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -82,41 +78,7 @@ func runGenerate(prompt, target string) error {
 		return fmt.Errorf("generation failed: %w", err)
 	}
 
-	// Display the generated command
-	fmt.Printf("\n\033[1;34m❯ %s\033[0m\n\n", command)
-
-	// Ask for confirmation
-	fmt.Print("\033[33mRun this command? [Y/n]: \033[0m")
-	reader := bufio.NewReader(os.Stdin)
-	answer, _ := reader.ReadString('\n')
-	answer = strings.TrimSpace(strings.ToLower(answer))
-
-	if answer != "" && answer != "y" && answer != "yes" {
-		fmt.Println("Cancelled.")
-		return nil
-	}
-
-	// Execute the command
-	return executeCommand(command)
-}
-
-// executeCommand runs a shell command and streams output to stdout/stderr.
-func executeCommand(command string) error {
-	var cmd *exec.Cmd
-
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("powershell", "-Command", command)
-	} else {
-		shell := os.Getenv("SHELL")
-		if shell == "" {
-			shell = "sh"
-		}
-		cmd = exec.Command(shell, "-c", command)
-	}
-
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
+	// Print the command to stdout so the user can copy/pipe it
+	fmt.Println(command)
+	return nil
 }
