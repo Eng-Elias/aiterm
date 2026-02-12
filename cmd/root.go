@@ -34,12 +34,6 @@ describe what you want, and aiterm will generate and optionally execute the comm
 			return fmt.Errorf("failed to load config: %w", err)
 		}
 
-		// If API token is missing, run setup wizard
-		if cfg.APIToken == "" {
-			fmt.Println("No API token configured. Running setup wizard...")
-			return runSetup()
-		}
-
 		return runTUI(cfg)
 	},
 }

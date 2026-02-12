@@ -19,24 +19,24 @@ import (
 type Mode int
 
 const (
-	ModeShell    Mode = iota // Normal shell pass-through
-	ModeAIInput              // Accepting AI prompt input
-	ModeLoading              // Waiting for AI response
-	ModeConfirm              // Showing generated command, awaiting confirmation
+	ModeShell   Mode = iota // Normal shell pass-through
+	ModeAIInput             // Accepting AI prompt input
+	ModeLoading             // Waiting for AI response
+	ModeConfirm             // Showing generated command, awaiting confirmation
 )
 
 // Model is the bubbletea model for the TUI.
 type Model struct {
-	cfg      *config.Config
-	client   *ai.Client
-	session  *shell.Session
+	cfg       *config.Config
+	client    *ai.Client
+	session   *shell.Session
 	shellInfo *shell.Info
 
 	mode         Mode
-	aiInput      string       // user's natural language input
-	generatedCmd string       // AI-generated command
-	errMsg       string       // error message to display
-	shellOutput  string       // accumulated shell output for display
+	aiInput      string // user's natural language input
+	generatedCmd string // AI-generated command
+	errMsg       string // error message to display
+	shellOutput  string // accumulated shell output for display
 	width        int
 	height       int
 	quitting     bool
@@ -224,6 +224,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleShellKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Ctrl+K: activate AI mode
 	if msg.Type == tea.KeyCtrlK {
+		if err := m.cfg.Validate(); err != nil {
+			m.errMsg = "AI not configured — run 'aiterm setup' to set your API token"
+			return m, nil
+		}
 		m.mode = ModeAIInput
 		m.aiInput = ""
 		m.errMsg = ""
