@@ -1,0 +1,56 @@
+# ============================================================
+# LiteLLM Proxy — Docker Compose
+# ============================================================
+# Quick start:
+#   1. cp .env.example .env   (then fill in values)
+#   2. docker compose up -d
+#   3. Open http://localhost:4000/ui for the dashboard
+# ============================================================
+
+services:
+  # --- LiteLLM Proxy ------------------------------------------
+  litellm:
+    build: .
+    container_name: litellm-proxy
+    restart: unless-stopped
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    networks:
+      - litellm-net
+
+  # --- PostgreSQL (for virtual keys & spend tracking) ---------
+  db:
+    image: postgres:16-alpine
+    container_name: litellm-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm
+      POSTGRES_DB: litellm
+    volumes:
+      - litellm-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - litellm-net
+
+volumes:
+  litellm-db-data:
+
+networks:
+  litellm-net:
+    driver: bridge

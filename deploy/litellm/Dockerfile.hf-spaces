@@ -1,0 +1,18 @@
+# ============================================================
+# LiteLLM Proxy — HuggingFace Spaces Variant
+# ============================================================
+# HF Spaces requires port 7860 and has its own secret management.
+# Set secrets in Space Settings > Repository secrets:
+#   HF_TOKEN, LITELLM_MASTER_KEY, DATABASE_URL, UI_PASSWORD
+# ============================================================
+
+FROM ghcr.io/berriai/litellm:main-latest
+
+COPY config.yaml /app/config.yaml
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["curl", "-f", "http://localhost:7860/health"] || exit 1
+
+EXPOSE 7860
+
+CMD ["litellm", "--config", "/app/config.yaml", "--port", "7860", "--ui"]
