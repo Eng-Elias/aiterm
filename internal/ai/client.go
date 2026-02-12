@@ -56,16 +56,31 @@ type chatResponse struct {
 	} `json:"error,omitempty"`
 }
 
-// systemPrompt builds the system prompt based on the current OS and shell.
-func systemPrompt(shellType string) string {
-	osName := runtime.GOOS
-	if shellType == "" || shellType == "auto" {
-		if osName == "windows" {
-			shellType = "PowerShell"
-		} else {
-			shellType = "bash"
+// ResolveTargetOS maps a user-provided -t flag to a full OS name.
+// If empty or "auto", it detects the current OS.
+func ResolveTargetOS(target string) (osName string, shellType string) {
+	switch strings.ToLower(target) {
+	case "win", "windows":
+		return "Windows", "PowerShell"
+	case "linux":
+		return "Linux", "bash"
+	case "mac", "macos", "darwin":
+		return "macOS", "zsh"
+	default:
+		// Auto-detect
+		switch runtime.GOOS {
+		case "windows":
+			return "Windows", "PowerShell"
+		case "darwin":
+			return "macOS", "zsh"
+		default:
+			return "Linux", "bash"
 		}
 	}
+}
+
+// systemPrompt builds the system prompt for the given OS and shell.
+func systemPrompt(osName, shellType string) string {
 	return fmt.Sprintf(
 		"You are a shell command generator. Generate only a single, valid shell command based on the user's description. "+
 			"Return ONLY the command with no explanation, no markdown, no code blocks. "+
@@ -75,16 +90,18 @@ func systemPrompt(shellType string) string {
 }
 
 // GenerateCommand sends a natural language description to the AI API and
-// returns the generated shell command.
-func (c *Client) GenerateCommand(ctx context.Context, description string) (string, error) {
+// returns the generated shell command. targetOS can be "win", "linux", "mac", or "" for auto.
+func (c *Client) GenerateCommand(ctx context.Context, description, targetOS string) (string, error) {
 	if err := c.cfg.Validate(); err != nil {
 		return "", err
 	}
 
+	osName, shellType := ResolveTargetOS(targetOS)
+
 	reqBody := chatRequest{
 		Model: c.cfg.Model,
 		Messages: []chatMessage{
-			{Role: "system", Content: systemPrompt(c.cfg.Shell)},
+			{Role: "system", Content: systemPrompt(osName, shellType)},
 			{Role: "user", Content: fmt.Sprintf("Generate a single shell command for: %s", description)},
 		},
 	}

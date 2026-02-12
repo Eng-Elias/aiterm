@@ -2,19 +2,21 @@
 
 **AI-powered terminal command generator** — describe what you want in plain English, get the shell command instantly.
 
-`aiterm` wraps your shell with an AI overlay. Press `Ctrl+K` at any time, type a natural language description, and aiterm generates and (optionally) executes the corresponding shell command.
+```bash
+aiterm "find all PDF files modified in the last 7 days"
+```
 
 ---
 
 ## Features
 
-- **Interactive AI Mode** — Press `Ctrl+K` to activate, type a description, get a command
-- **Shell Wrapper** — Transparent PTY pass-through; your shell works exactly as normal
-- **Command Confirmation** — Always see the generated command before it runs
+- **Simple CLI** — Just run `aiterm "your description"` and get a command
+- **Auto-Detect OS** — Automatically generates commands for your current platform
+- **Target Any OS** — Use `-t win`, `-t linux`, or `-t mac` to generate for other platforms
+- **Command Confirmation** — Review the generated command before it runs
 - **Headless Mode** — `aiterm generate "..."` for scripting and piping
 - **OpenAI-Compatible** — Works with OpenAI, LiteLLM, Ollama, and any compatible endpoint
 - **Cross-Platform** — Linux, macOS, and Windows support
-- **Configurable** — JSON config with setup wizard
 - **Secure** — API tokens masked in output, config files with restricted permissions
 
 ---
@@ -66,33 +68,42 @@ You will be prompted for:
 
 The wizard will test your connection and save the configuration.
 
-### 2. Launch aiterm
+### 2. Generate a Command
 
 ```bash
-aiterm
+aiterm "list all files larger than 100MB"
 ```
 
-This opens your default shell inside aiterm. Use it normally — it's a transparent wrapper.
-
-### 3. Generate a Command
-
-1. Press **Ctrl+K** to activate AI mode
-2. Type a description: `find all PDF files modified in the last 7 days`
-3. Press **Enter** to send to the AI
-4. Review the generated command
-5. Press **Enter** to execute, or **Esc** to cancel
+aiterm will:
+1. Send your description to the AI
+2. Display the generated command
+3. Ask for confirmation (`Y/n`)
+4. Execute the command if you confirm
 
 ---
 
 ## Usage
 
-### Interactive TUI Mode
+### Basic Usage
 
 ```bash
-aiterm
+# Auto-detects your OS and generates the right command
+aiterm "show disk usage sorted by size"
+
+# Target a specific OS
+aiterm "find all log files" -t linux
+aiterm "list running processes" -t mac
+aiterm "check open ports" -t win
 ```
 
-Launches the interactive shell wrapper. Use your shell normally; press `Ctrl+K` to enter AI mode.
+### Target OS Flag (`-t`)
+
+| Flag Value       | Target         | Shell      |
+|------------------|----------------|------------|
+| `win`, `windows` | Windows        | PowerShell |
+| `linux`          | Linux          | bash       |
+| `mac`, `macos`   | macOS          | zsh        |
+| *(omitted)*      | Auto-detected  | Auto       |
 
 ### Headless Mode
 
@@ -101,7 +112,7 @@ aiterm generate "list all docker containers"
 # Output: docker ps -a
 ```
 
-Generates a command and prints it to stdout. Useful for scripting:
+Generates a command and prints it to stdout without confirmation. Useful for scripting:
 
 ```bash
 $(aiterm generate "count lines in all Python files")
@@ -131,20 +142,6 @@ aiterm version
 
 ---
 
-## Keyboard Shortcuts
-
-| Shortcut  | Context       | Action                                    |
-|-----------|---------------|-------------------------------------------|
-| `Ctrl+K`  | Shell mode    | Activate AI command generation mode       |
-| `Escape`  | AI mode       | Cancel and return to normal shell         |
-| `Enter`   | AI input      | Send description to AI                    |
-| `Enter`   | Confirmation  | Execute the generated command             |
-| `Escape`  | Confirmation  | Discard command and return to shell       |
-| `Ctrl+C`  | Shell mode    | Send SIGINT to shell (normal behavior)    |
-| `Ctrl+D`  | Shell mode    | Send EOF to shell (normal behavior)       |
-
----
-
 ## Configuration Reference
 
 Configuration is stored in `~/.aiterm/config.json` (or `%USERPROFILE%\.aiterm\config.json` on Windows).
@@ -163,13 +160,7 @@ Configuration is stored in `~/.aiterm/config.json` (or `%USERPROFILE%\.aiterm\co
 | `api_endpoint` | OpenAI-compatible chat completions URL               | `https://api.openai.com/v1/chat/completions`     |
 | `api_token`    | API bearer token                                     | *(required)*                                     |
 | `model`        | Model name to use                                    | `gpt-4o-mini`                                    |
-| `shell`        | Shell to use (`auto`, `bash`, `zsh`, `powershell`)   | `auto`                                           |
-
-### Shell Auto-Detection
-
-When `shell` is set to `auto`:
-- **Linux/macOS**: Uses `$SHELL`, falls back to `bash` → `sh`
-- **Windows**: Uses `pwsh` (PowerShell 7), falls back to `powershell` → `cmd`
+| `shell`        | Shell hint for prompt context                        | `auto`                                           |
 
 ---
 
@@ -188,7 +179,7 @@ aiterm works with any OpenAI-compatible chat completions endpoint:
 
 ## Troubleshooting
 
-### "No API token configured"
+### "AI not configured"
 
 Run `aiterm setup` to configure your API credentials.
 
@@ -210,20 +201,12 @@ aiterm config set api_token sk-your-new-token
 
 Wait a moment and try again. Consider upgrading your API plan for higher limits.
 
-### Shell not detected
-
-Override the shell manually:
-
-```bash
-aiterm config set shell /usr/bin/bash
-```
-
 ### Debug Mode
 
 Enable debug logging for troubleshooting:
 
 ```bash
-aiterm --debug
+aiterm "your prompt" --debug
 ```
 
 Logs are written to `~/.aiterm/debug.log`.
@@ -252,7 +235,7 @@ make dev            # Live reload with air
 aiterm/
 ├── main.go                    # Entry point
 ├── cmd/
-│   ├── root.go                # Root command & TUI launcher
+│   ├── root.go                # Root command & CLI logic
 │   ├── config.go              # Config subcommands
 │   ├── generate.go            # Headless generation
 │   ├── setup.go               # Setup wizard
@@ -261,16 +244,9 @@ aiterm/
 │   ├── ai/
 │   │   ├── client.go          # OpenAI API client
 │   │   └── client_test.go     # API client tests
-│   ├── config/
-│   │   ├── config.go          # Configuration management
-│   │   └── config_test.go     # Config tests
-│   ├── shell/
-│   │   ├── shell.go           # Shell detection
-│   │   ├── pty_unix.go        # Unix PTY handling
-│   │   ├── pty_windows.go     # Windows pipe handling
-│   │   └── shell_test.go      # Shell tests
-│   └── tui/
-│       └── model.go           # Bubbletea TUI model
+│   └── config/
+│       ├── config.go          # Configuration management
+│       └── config_test.go     # Config tests
 ├── Makefile                   # Build targets
 ├── .air.toml                  # Live reload config
 ├── go.mod

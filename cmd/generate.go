@@ -33,7 +33,7 @@ var generateCmd = &cobra.Command{
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		command, err := client.GenerateCommand(ctx, description)
+		command, err := client.GenerateCommand(ctx, description, "")
 		if err != nil {
 			return fmt.Errorf("generation failed: %w", err)
 		}

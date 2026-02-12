@@ -47,7 +47,7 @@ func TestGenerateCommand_Success(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd, err := client.GenerateCommand(ctx, "list all files")
+	cmd, err := client.GenerateCommand(ctx, "list all files", "")
 	if err != nil {
 		t.Fatalf("GenerateCommand failed: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestGenerateCommand_AuthError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := client.GenerateCommand(ctx, "list files")
+	_, err := client.GenerateCommand(ctx, "list files", "")
 	if err == nil {
 		t.Fatal("expected error for unauthorized request")
 	}
@@ -98,7 +98,7 @@ func TestGenerateCommand_RateLimit(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := client.GenerateCommand(ctx, "list files")
+	_, err := client.GenerateCommand(ctx, "list files", "")
 	if err == nil {
 		t.Fatal("expected error for rate-limited request")
 	}
@@ -114,7 +114,7 @@ func TestGenerateCommand_ValidationError(t *testing.T) {
 	client := NewClient(cfg)
 	ctx := context.Background()
 
-	_, err := client.GenerateCommand(ctx, "list files")
+	_, err := client.GenerateCommand(ctx, "list files", "")
 	if err == nil {
 		t.Fatal("expected validation error for missing token")
 	}
@@ -163,5 +163,36 @@ func TestTestConnection_Success(t *testing.T) {
 
 	if err := client.TestConnection(ctx); err != nil {
 		t.Errorf("TestConnection failed: %v", err)
+	}
+}
+
+func TestResolveTargetOS(t *testing.T) {
+	tests := []struct {
+		input         string
+		expectedOS    string
+		expectedShell string
+	}{
+		{"win", "Windows", "PowerShell"},
+		{"windows", "Windows", "PowerShell"},
+		{"linux", "Linux", "bash"},
+		{"mac", "macOS", "zsh"},
+		{"macos", "macOS", "zsh"},
+		{"darwin", "macOS", "zsh"},
+	}
+
+	for _, tt := range tests {
+		osName, shellType := ResolveTargetOS(tt.input)
+		if osName != tt.expectedOS {
+			t.Errorf("ResolveTargetOS(%q) osName = %q, want %q", tt.input, osName, tt.expectedOS)
+		}
+		if shellType != tt.expectedShell {
+			t.Errorf("ResolveTargetOS(%q) shellType = %q, want %q", tt.input, shellType, tt.expectedShell)
+		}
+	}
+
+	// Auto-detect (empty string) should return something valid
+	osName, shellType := ResolveTargetOS("")
+	if osName == "" || shellType == "" {
+		t.Errorf("ResolveTargetOS(\"\") returned empty values: os=%q shell=%q", osName, shellType)
 	}
 }
