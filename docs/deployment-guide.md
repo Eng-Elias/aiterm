@@ -87,30 +87,9 @@ For production use with guaranteed availability and no rate limits:
 
 ---
 
-## Step 3: Set Up Supabase Database (Free)
+## Step 3: Deploy LiteLLM on HuggingFace Spaces
 
-LiteLLM needs PostgreSQL to store virtual keys and track spend.
-
-1. Go to [supabase.com](https://supabase.com) and sign in
-2. Click **New Project**
-   - Name: `litellm-aiterm`
-   - Database password: choose a strong password (save it!)
-   - Region: choose the closest to you
-3. Wait for the project to be created (~1 minute)
-4. Go to **Project Settings** → **Database**
-5. Under **Connection string** → **URI**, copy the connection string:
-
-```
-postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
-```
-
-Replace `[YOUR-PASSWORD]` with the password you chose.
-
----
-
-## Step 4: Deploy LiteLLM on HuggingFace Spaces
-
-### 4.1 Create the Space
+### 3.1 Create the Space
 
 1. Go to [huggingface.co/new-space](https://huggingface.co/new-space)
 2. Fill in:
@@ -119,18 +98,18 @@ Replace `[YOUR-PASSWORD]` with the password you chose.
    - **Visibility**: **Private** (recommended)
 3. Click **Create Space**
 
-### 4.2 Set Secrets
+### 3.2 Set Secrets
 
 Go to your Space → **Settings** → **Repository secrets** and add:
 
-| Secret Name | Value | Description |
-|-------------|-------|-------------|
-| `HF_TOKEN` | `hf_xxxxxxxx` | Your HuggingFace token from Step 1 |
-| `LITELLM_MASTER_KEY` | `sk-master-xxxxx` | A strong random key (generate with `openssl rand -hex 32`) |
-| `DATABASE_URL` | `postgresql://postgres:...` | Supabase connection string from Step 3 |
-| `UI_PASSWORD` | `your-admin-password` | Password for the LiteLLM dashboard |
+| Secret Name | Value | Required? |
+|-------------|-------|-----------|
+| `HF_TOKEN` | `hf_xxxxxxxx` (from Step 1) | **Yes** |
+| `LITELLM_MASTER_KEY` | A strong random key (e.g. `openssl rand -hex 32`) | **Yes** |
 
-### 4.3 Upload Deploy Files
+> **Note:** A database is **not required** to get started. LiteLLM works without one — you just won't have virtual keys or spend tracking. See [Optional: Add a Database](#optional-add-a-database) later.
+
+### 3.3 Upload Deploy Files
 
 You need two files in the Space repo. Clone it and add them:
 
@@ -159,11 +138,13 @@ model_list:
 
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
-  database_url: "os.environ/DATABASE_URL"
-  enable_user_auth: true
   max_budget: 10.0
   budget_duration: "30d"
-  ui_access_mode: "admin_only"
+
+  # Uncomment these if you add a database later:
+  # database_url: "os.environ/DATABASE_URL"
+  # enable_user_auth: true
+  # ui_access_mode: "admin_only"
 
 rate_limits:
   - model: "default"
@@ -202,7 +183,7 @@ git commit -m "Deploy LiteLLM proxy"
 git push
 ```
 
-### 4.4 Wait for Build
+### 3.4 Wait for Build
 
 1. Go to your Space page on HuggingFace
 2. Watch the **Logs** tab — the build takes 2–5 minutes
@@ -213,7 +194,7 @@ Your proxy URL is:
 https://YOUR_USERNAME-aiterm-proxy.hf.space
 ```
 
-### 4.5 Verify the Proxy
+### 3.5 Verify the Proxy
 
 ```bash
 # Health check
@@ -231,11 +212,19 @@ Log in with your `LITELLM_MASTER_KEY`.
 
 ---
 
-## Step 5: Create a Virtual Key
+## Step 4: Get Your API Token
 
-Virtual keys let you control access without exposing your master key or HF token.
+### Without a database (simplest)
 
-### Via curl:
+Use your **master key** directly as the API token for aiterm. This works fine for personal use:
+
+```bash
+# Your LITELLM_MASTER_KEY is your API token
+```
+
+### With a database (virtual keys)
+
+If you added a database (see [Optional: Add a Database](#optional-add-a-database)), you can create scoped virtual keys:
 
 ```bash
 curl -X POST https://YOUR_USERNAME-aiterm-proxy.hf.space/key/generate \
@@ -244,33 +233,15 @@ curl -X POST https://YOUR_USERNAME-aiterm-proxy.hf.space/key/generate \
   -d '{
     "models": ["default"],
     "max_budget": 5.0,
-    "budget_duration": "30d",
-    "metadata": {"user": "my-aiterm"}
+    "budget_duration": "30d"
   }'
 ```
 
-**Response:**
-
-```json
-{
-  "key": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-  ...
-}
-```
-
-Save the `key` value — this is your virtual key for aiterm.
-
-### Via Dashboard:
-
-1. Open `https://YOUR_USERNAME-aiterm-proxy.hf.space/ui`
-2. Go to **Virtual Keys**
-3. Click **Generate Key**
-4. Set models, budget, and duration
-5. Copy the generated key
+The response `key` field is your virtual key.
 
 ---
 
-## Step 6: Configure aiterm
+## Step 5: Configure aiterm
 
 Now connect your aiterm CLI to the deployed proxy:
 
@@ -311,7 +282,7 @@ shell:        auto
 
 ---
 
-## Step 7: Test the App
+## Step 6: Test the App
 
 ### Basic Test
 
@@ -365,9 +336,9 @@ aiterm config set api_token sk-your-virtual-key-here
 
 ### "Authentication failed"
 
-- Make sure you're using a **virtual key** (`sk-...`), not the master key
-- Verify the key is active in the dashboard
-- Regenerate the key if needed
+- If running **without a database**: use your `LITELLM_MASTER_KEY` as the `api_token`
+- If running **with a database**: use a virtual key generated via the dashboard or API
+- Verify the key matches exactly (no extra spaces)
 
 ### "Model not found" or empty response
 
@@ -375,17 +346,65 @@ aiterm config set api_token sk-your-virtual-key-here
 - Verify the HF model is accessible: test it with curl (Step 2)
 - Check LiteLLM logs in the Space **Logs** tab
 
-### "Database connection failed"
+### "Database connection failed" (P1001 error)
 
-- Verify your Supabase project is active
-- Check the `DATABASE_URL` secret — it must include the correct password
-- Ensure the format is: `postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres`
+This happens when `database_url` is set in `config.yaml` but the database is unreachable. Two fixes:
+
+1. **Remove the database** (recommended for getting started): make sure `database_url` is commented out in `config.yaml`
+2. **Fix the connection string**: ensure `DATABASE_URL` secret is a valid PostgreSQL URI:
+   ```
+   postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres
+   ```
 
 ### Slow responses
 
 - First request may be slow (~10–30s) if the HF Space or model endpoint was sleeping
 - Subsequent requests should be faster (1–5s)
 - Consider enabling LiteLLM caching (already enabled in config)
+
+---
+
+## Optional: Add a Database
+
+Adding PostgreSQL enables **virtual keys**, **spend tracking**, and **per-key budgets**. This is optional — LiteLLM works without it.
+
+### Set Up Supabase (Free)
+
+1. Go to [supabase.com](https://supabase.com) and sign in
+2. Click **New Project**
+   - Name: `litellm-aiterm`
+   - Database password: choose a strong password (save it!)
+   - Region: closest to your HF Space
+3. Wait ~1 minute for creation
+4. Go to **Project Settings** → **Database** → **Connection string** → **URI**
+5. Copy the connection string:
+   ```
+   postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
+   ```
+
+### Add to HF Space
+
+1. Add a new secret in Space Settings:
+   - `DATABASE_URL` = your Supabase connection string
+2. Update `config.yaml` — uncomment the database lines:
+   ```yaml
+   general_settings:
+     master_key: "os.environ/LITELLM_MASTER_KEY"
+     database_url: "os.environ/DATABASE_URL"
+     enable_user_auth: true
+     ui_access_mode: "admin_only"
+     max_budget: 10.0
+     budget_duration: "30d"
+   ```
+3. Push and rebuild the Space
+
+### Other Free Database Providers
+
+| Provider | Free Tier |
+|----------|-----------|
+| [Supabase](https://supabase.com) | 500 MB |
+| [Neon](https://neon.tech) | 512 MB |
+| [Railway](https://railway.app) | Trial credits |
 
 ---
 
