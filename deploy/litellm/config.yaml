@@ -28,16 +28,17 @@ model_list:
 
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
+  database_url: "os.environ/DATABASE_URL"
 
-  # Database is OPTIONAL. Without it, LiteLLM works but virtual keys
-  # and spend tracking are disabled. Uncomment to enable:
-  # database_url: "os.environ/DATABASE_URL"
-  # enable_user_auth: true
-  # ui_access_mode: "admin_only"
+  # Virtual key authentication
+  enable_user_auth: true
 
   # Global budget cap (USD). Set 0 to disable.
   max_budget: 10.0
   budget_duration: "30d"
+
+  # Dashboard access
+  ui_access_mode: "admin_only"
 
 # ----- Rate Limits --------------------------------------------
 
