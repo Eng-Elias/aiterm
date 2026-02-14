@@ -112,19 +112,43 @@ postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
 
 4. **Replace `[YOUR-PASSWORD]`** with the database password you chose above
 
-> **Important:** The connection string must be a complete, valid PostgreSQL URI. A malformed value (e.g. missing password, wrong host) will cause a `P1001: Can't reach database server` error on startup.
+> **Important:** If your password contains special characters (`@`, `#`, `!`, `%`, etc.), you **must URL-encode them** or the URI will be parsed incorrectly and LiteLLM will fail with `P1001: Can't reach database server`.
 
-### 3.3 Verify the Format
+### 3.3 URL-Encode Special Characters in Password
 
-Your `DATABASE_URL` should look exactly like this (with real values):
+Common characters that **must** be encoded:
+
+| Character | Encoded | Character | Encoded |
+|-----------|---------|-----------|---------|
+| `@` | `%40` | `#` | `%23` |
+| `!` | `%21` | `$` | `%24` |
+| `%` | `%25` | `&` | `%26` |
+| `/` | `%2F` | `=` | `%3D` |
+| `+` | `%2B` | `:` | `%3A` |
+
+**Example:** if your password is `MyP@ss#123`, the encoded version is `MyP%40ss%23123`.
+
+You can encode your password with:
+
+```bash
+# Python (one-liner)
+python3 -c "import urllib.parse; print(urllib.parse.quote('YOUR_PASSWORD_HERE', safe=''))"
+
+# Or use an online URL encoder (encode the password only, not the full URI)
+```
+
+### 3.4 Verify the Final Format
+
+Your `DATABASE_URL` should look like this (with real values, password URL-encoded):
 
 ```
-postgresql://postgres:MyStr0ngP@ss@db.abcdefghijkl.supabase.co:5432/postgres
+postgresql://postgres:MyP%40ss%23123@db.abcdefghijkl.supabase.co:5432/postgres
 ```
 
 Double-check:
 - Starts with `postgresql://`
-- Contains `postgres:YOUR_PASSWORD@db.`
+- Password special characters are URL-encoded
+- Only one `@` appears (the one separating credentials from host)
 - Ends with `.supabase.co:5432/postgres`
 - No spaces, no quotes, no line breaks
 
