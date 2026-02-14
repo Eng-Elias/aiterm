@@ -182,16 +182,16 @@ litellm_settings:
 **Create `Dockerfile`:**
 
 ```dockerfile
-FROM ghcr.io/berriai/litellm:main-latest
+FROM docker.litellm.ai/berriai/litellm:main-stable
 
-COPY config.yaml /app/config.yaml
+WORKDIR /app
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD ["curl", "-f", "http://localhost:7860/health"] || exit 1
+COPY config.yaml .
 
 EXPOSE 7860
 
-CMD ["litellm", "--config", "/app/config.yaml", "--port", "7860", "--ui"]
+# UI is available at /ui by default — no flag needed
+CMD ["--port", "7860", "--config", "config.yaml"]
 ```
 
 **Push to the Space:**

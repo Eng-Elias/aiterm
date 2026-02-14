@@ -1,13 +1,11 @@
-FROM ghcr.io/berriai/litellm:main-latest
+FROM docker.litellm.ai/berriai/litellm:main-stable
+
+WORKDIR /app
 
 # Copy proxy configuration
-COPY config.yaml /app/config.yaml
-
-# Health check — LiteLLM exposes /health
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD ["curl", "-f", "http://localhost:4000/health"] || exit 1
+COPY config.yaml .
 
 EXPOSE 4000
 
-# Start LiteLLM proxy with config
-CMD ["litellm", "--config", "/app/config.yaml", "--port", "4000"]
+# UI is enabled by default at /ui — no --ui flag needed
+CMD ["--port", "4000", "--config", "config.yaml"]

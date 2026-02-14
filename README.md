@@ -1,4 +1,4 @@
-# aiterm
+~# aiterm
 
 **AI-powered terminal command generator** — describe what you want in plain English, get the shell command instantly.
 
