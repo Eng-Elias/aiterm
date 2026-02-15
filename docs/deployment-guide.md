@@ -100,23 +100,28 @@ LiteLLM requires PostgreSQL for virtual keys, spend tracking, and user authentic
    - **Region**: choose the closest to you
 3. Wait ~1 minute for the project to be created
 
-### 3.2 Get the Connection String
+### 3.2 Get the Connection Pooler String
+
+Cloud platforms like HuggingFace Spaces typically block direct PostgreSQL connections (port 5432). Use Supabase's **connection pooler** instead (port 6543).
 
 1. Go to **Project Settings** → **Database**
-2. Scroll to **Connection string** → select **URI**
-3. Copy the string. It looks like this:
+2. Find **Connection string** → switch to **Connection pooling** → select **Session** mode
+3. Copy the URI. It looks like this:
 
 ```
-postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
+postgresql://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
 ```
+
+> **Note the differences from the direct connection:**
+> - **Host**: `aws-0-REGION.pooler.supabase.com` (not `db.PROJECT.supabase.co`)
+> - **Port**: `6543` (not `5432`)
+> - **User**: `postgres.PROJECT_REF` (includes project ref)
 
 4. **Replace `[YOUR-PASSWORD]`** with the database password you chose above
 
-> **Important:** If your password contains special characters (`@`, `#`, `!`, `%`, etc.), you **must URL-encode them** or the URI will be parsed incorrectly and LiteLLM will fail with `P1001: Can't reach database server`.
-
 ### 3.3 URL-Encode Special Characters in Password
 
-Common characters that **must** be encoded:
+If your password contains special characters (`@`, `#`, `!`, `%`, etc.), you **must URL-encode them** or the URI will be parsed incorrectly.
 
 | Character | Encoded | Character | Encoded |
 |-----------|---------|-----------|---------|
@@ -126,15 +131,12 @@ Common characters that **must** be encoded:
 | `/` | `%2F` | `=` | `%3D` |
 | `+` | `%2B` | `:` | `%3A` |
 
-**Example:** if your password is `MyP@ss#123`, the encoded version is `MyP%40ss%23123`.
+**Example:** password `MyP@ss#123` → encoded as `MyP%40ss%23123`
 
-You can encode your password with:
+Encode your password with:
 
 ```bash
-# Python (one-liner)
 python3 -c "import urllib.parse; print(urllib.parse.quote('YOUR_PASSWORD_HERE', safe=''))"
-
-# Or use an online URL encoder (encode the password only, not the full URI)
 ```
 
 ### 3.4 Verify the Final Format
@@ -142,14 +144,16 @@ python3 -c "import urllib.parse; print(urllib.parse.quote('YOUR_PASSWORD_HERE', 
 Your `DATABASE_URL` should look like this (with real values, password URL-encoded):
 
 ```
-postgresql://postgres:MyP%40ss%23123@db.abcdefghijkl.supabase.co:5432/postgres
+postgresql://postgres.abcdefghijkl:MyP%40ss%23123@aws-0-us-east-1.pooler.supabase.com:6543/postgres
 ```
 
 Double-check:
 - Starts with `postgresql://`
+- User is `postgres.YOUR_PROJECT_REF`
 - Password special characters are URL-encoded
+- Host is `aws-0-REGION.pooler.supabase.com`
+- Port is `6543`
 - Only one `@` appears (the one separating credentials from host)
-- Ends with `.supabase.co:5432/postgres`
 - No spaces, no quotes, no line breaks
 
 ---
@@ -416,14 +420,18 @@ aiterm config set api_token sk-your-virtual-key-here
 
 ### "Database connection failed" (P1001 error)
 
-The `DATABASE_URL` secret is malformed or the database is unreachable.
+The `DATABASE_URL` secret is malformed or the database is unreachable. Common causes:
 
-1. **Check the format** — must be a valid PostgreSQL URI with no extra spaces or line breaks:
+1. **Using direct connection instead of pooler** — HF Spaces blocks port 5432. You must use the **connection pooler** (port 6543). See Step 3.2.
    ```
-   postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres
+   # WRONG (direct, port 5432):
+   postgresql://postgres:PASS@db.PROJECT.supabase.co:5432/postgres
+
+   # CORRECT (pooler, port 6543):
+   postgresql://postgres.PROJECT:PASS@aws-0-REGION.pooler.supabase.com:6543/postgres
    ```
-2. **Verify the password** — re-copy from Supabase: Project Settings → Database → Connection string → URI
-3. **Check Supabase is active** — free-tier projects pause after 1 week of inactivity. Go to the Supabase dashboard and unpause if needed.
+2. **Special characters in password not URL-encoded** — `@`, `#`, `!` etc. must be percent-encoded. See Step 3.3.
+3. **Supabase project is paused** — free-tier projects pause after 1 week of inactivity. Go to the Supabase dashboard and click **Restore**.
 
 ### Slow responses
 
